@@ -37,11 +37,13 @@ is_running() { $RUNTIME ps --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTA
 is_exists()  { $RUNTIME ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"; }
 
 need_runtime() {
-    [ -z "$RUNTIME" ] && { err "找不到 podman 或 docker"; exit 1; }
+    # 用 if（而非 `cond && {…}`）：在 set -e 下，找到 runtime 時這行會回傳 1，
+    # 會讓整個腳本「無聲無息」直接結束。改 if 才能在成功路徑回傳 0。
+    if [ -z "$RUNTIME" ]; then err "找不到 podman 或 docker"; exit 1; fi
 }
 
 need_venv() {
-    [ ! -f "$VENV_PY" ] && { err "虛擬環境不存在，請先執行 ./install.sh"; exit 1; }
+    if [ ! -f "$VENV_PY" ]; then err "虛擬環境不存在，請先執行 ./install.sh"; exit 1; fi
 }
 
 load_env() {
@@ -54,7 +56,7 @@ run_container() {
     local port="${PORT:-8080}"
     $RUNTIME run -d \
         --name "$CONTAINER" \
-        --network host \
+        -p "${PORT:-8080}:${PORT:-8080}" \
         --env-file "$ENV_FILE" \
         -e HISTORY_DB=/data/history.db \
         -v "${CONFIG_DIR_HOST}:/config:z" \
@@ -70,14 +72,14 @@ run_container() {
 # ── cmd_venv：建立 / 更新本機 Python 虛擬環境 ────────────────────────────────
 cmd_venv() {
     local quiet="${1:-}"
-    [ -z "$quiet" ] && { echo -e "${B}── Python 虛擬環境 ──────────────────────────${N}"; }
+    if [ -z "$quiet" ]; then echo -e "${B}── Python 虛擬環境 ──────────────────────────${N}"; fi
 
     if [ ! -d "$VENV_DIR" ]; then
         echo -n "  建立 venv... "
         python3 -m venv "$VENV_DIR"
         echo -e "${G}完成${N}"
     else
-        [ -z "$quiet" ] && echo -e "  venv 已存在：${D}${VENV_DIR}${N}"
+        if [ -z "$quiet" ]; then echo -e "  venv 已存在：${D}${VENV_DIR}${N}"; fi
     fi
 
     echo -n "  安裝/更新相依套件... "
@@ -85,7 +87,7 @@ cmd_venv() {
     "$VENV_PIP" install --quiet -r app/requirements.txt
     echo -e "${G}完成${N}"
 
-    [ -z "$quiet" ] && echo -e "\n  啟用方式：${C}source venv/bin/activate${N}"
+    if [ -z "$quiet" ]; then echo -e "\n  啟用方式：${C}source venv/bin/activate${N}"; fi
 }
 
 # ── cmd_install：互動式完整安裝 ───────────────────────────────────────────────
@@ -210,7 +212,7 @@ except Exception as e:
     echo -n "  啟動新容器... "
     $RUNTIME run -d \
         --name "$CONTAINER" \
-        --network host \
+        -p "${PORT:-8080}:${PORT:-8080}" \
         --env-file "$ENV_FILE" \
         -e HISTORY_DB=/data/history.db \
         -v "${CONFIG_DIR_HOST}:/config:z" \
@@ -264,6 +266,12 @@ cmd_run_local() {
     else
         warn ".env 不存在，使用預設值（NUT_HOST=localhost, PORT=8080）"
         warn "若需自訂請先複製：${C}cp .env.example .env${N}"
+    fi
+
+    # run-local 直接跑在宿主機，host.containers.internal 只在容器內有效，自動換回 localhost
+    if [ "${NUT_HOST:-}" = "host.containers.internal" ]; then
+        export NUT_HOST=localhost
+        warn "run-local：NUT_HOST host.containers.internal → ${C}localhost${N}"
     fi
 
     export CONFIG_DIR="${CONFIG_DIR_HOST}"
@@ -359,7 +367,7 @@ cmd_update() {
     echo -n "  啟動新容器... "
     $RUNTIME run -d \
         --name "$CONTAINER" \
-        --network host \
+        -p "${PORT:-8080}:${PORT:-8080}" \
         --env-file "$ENV_FILE" \
         -e HISTORY_DB=/data/history.db \
         -v "${CONFIG_DIR_HOST}:/config:z" \

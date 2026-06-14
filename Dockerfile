@@ -24,4 +24,8 @@ RUN python3 -c "import os,urllib.request as r; p='/static/chart.min.js'; (os.pat
 
 EXPOSE ${PORT}
 
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+# 用 exec-form 的 sh -c：JSON 陣列不會被 builder 在「建置時」展開變數，
+# 因此 ${PORT} 會原封不動存進映像，改由容器「啟動時」的 shell 解析，
+# 才能真正吃到 --env-file / .env 的 PORT。直接寫 shell-form 會被 buildah
+# 在建置時用 ENV 預設值 (8080) 展開並烤死，導致 .env 的 PORT 失效。
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

@@ -2,9 +2,12 @@ services:
   ups-monitor:
     build: .
     container_name: ups-monitor
-    # network_mode: host → 直接共用 host 網路，容器 port 即 host port，無需 ports 映射
-    # 若寫了 ports 在 host 模式下會被引擎忽略
-    network_mode: host
+    # 用 ports 映射（取代 network_mode: host），讓 podman ps 看得到埠的使用情況。
+    # 注意：bridge 模式下容器的 localhost 不是宿主機，若 NUT 跑在「同一台主機」，
+    # 請把 .env 的 NUT_HOST 改成 host.containers.internal（podman）才連得到；
+    # NUT 在別台主機（LAN IP）則不受影響。
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
     env_file: .env
     environment:
       - HISTORY_DB=/data/history.db   # 將 DB 掛到獨立 volume
