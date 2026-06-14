@@ -1,0 +1,14 @@
+services:
+  ups-monitor:
+    build: .
+    container_name: ups-monitor
+    # network_mode: host → 直接共用 host 網路，容器 port 即 host port，無需 ports 映射
+    # 若寫了 ports 在 host 模式下會被引擎忽略
+    network_mode: host
+    env_file: .env
+    environment:
+      - HISTORY_DB=/data/history.db   # 將 DB 掛到獨立 volume
+    volumes:
+      - ./config:/config:z            # settings.json
+      - ./data:/data:z                # history.db 歷史資料
+    restart: unless-stopped

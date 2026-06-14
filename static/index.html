@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UPS Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css?v=__ASSET_V__">
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <span class="brand-name">UPS Monitor</span>
+      </div>
+      <div class="header-right">
+        <div class="ws-badge" id="wsBadge">
+          <span class="ws-dot"></span>
+          <span id="wsLabel">連線中</span>
+        </div>
+        <button class="icon-btn notif-btn" id="notifBtn" title="啟用瀏覽器通知">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" title="通知設定">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- Battery Alert Banner -->
+      <div class="battery-alert" id="batteryAlert" hidden>
+        <div class="alert-inner">
+          <span class="alert-pulse"></span>
+          <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="16" height="11" rx="2"/><path d="M22 11v3"/><path d="M8 7V5a2 2 0 0 1 4 0v2"/>
+          </svg>
+          <div class="alert-text">
+            <strong>UPS 目前使用電池供電中</strong>
+            <span>市電可能已中斷，請注意電力狀況</span>
+          </div>
+        </div>
+        <button class="alert-close" id="alertClose">✕</button>
+      </div>
+
+      <!-- Status Banner -->
+      <div class="status-banner" id="statusBanner">
+        <div class="status-left">
+          <div class="status-dot-wrap">
+            <span class="status-pulse" id="statusPulse"></span>
+            <span class="status-dot-big" id="statusDot"></span>
+          </div>
+          <div>
+            <div class="status-code" id="statusCode">--</div>
+            <div class="status-desc" id="statusDesc">載入中...</div>
+          </div>
+        </div>
+        <div class="device-info">
+          <div class="device-model" id="deviceModel">--</div>
+          <div class="device-serial" id="deviceSerial"></div>
+        </div>
+      </div>
+
+      <!-- Metrics Grid -->
+      <div class="grid">
+
+        <div class="card card-battery">
+          <div class="card-label">電池電量</div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 120 120">
+              <circle class="ring-track" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" id="batteryRing" cx="60" cy="60" r="50"
+                style="stroke-dasharray:314.16;stroke-dashoffset:314.16"/>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-value" id="batteryCharge">--%</span>
+              <span class="ring-sub" id="batteryChargerStatus"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">預估續航</div>
+          <div class="metric-big" id="runtime">--</div>
+          <div class="metric-unit">分鐘</div>
+          <div class="card-sub" id="runtimeHour"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">負載</div>
+          <div class="metric-big" id="load">--%</div>
+          <div class="bar-wrap">
+            <div class="bar-fill" id="loadBar" style="width:0%"></div>
+          </div>
+          <div class="card-sub">
+            <span id="loadWatt">--</span> W / <span id="loadNominal">--</span> W
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">輸入電壓</div>
+          <div class="metric-big" id="inputVoltage">--</div>
+          <div class="metric-unit">Volt</div>
+          <div class="card-sub">頻率 <span id="inputFreq">--</span> Hz</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">輸出電壓</div>
+          <div class="metric-big" id="outputVoltage">--</div>
+          <div class="metric-unit">Volt</div>
+          <div class="card-sub">電流 <span id="outputCurrent">--</span> A</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">電池電壓</div>
+          <div class="metric-big" id="batteryVoltage">--</div>
+          <div class="metric-unit">Volt</div>
+          <div class="card-sub">額定 <span id="batteryVoltageNominal">--</span> V</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">效率</div>
+          <div class="metric-big" id="efficiency">--</div>
+          <div class="metric-unit">%</div>
+          <div class="card-sub">輸出 <span id="realpower">--</span> W</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">自我測試</div>
+          <div class="test-result" id="testResult">--</div>
+          <div class="card-sub">間隔 <span id="testInterval">--</span> 天</div>
+        </div>
+
+      </div>
+
+      <!-- ── Power Charts ───────────────────────────────────────────── -->
+      <section class="charts-section">
+
+        <div class="charts-head">
+          <h2 class="section-title">用電趨勢</h2>
+          <div class="range-tabs" id="rangeTabs">
+            <button class="range-tab" data-range="1h">1 小時</button>
+            <button class="range-tab active" data-range="24h">24 小時</button>
+            <button class="range-tab" data-range="7d">7 天</button>
+            <button class="range-tab" data-range="30d">30 天</button>
+          </div>
+        </div>
+
+        <!-- kWh Stats -->
+        <div class="kwh-grid">
+          <div class="kwh-card">
+            <div class="kwh-label">今日用電</div>
+            <div class="kwh-value" id="kwhToday">-- kWh</div>
+          </div>
+          <div class="kwh-card">
+            <div class="kwh-label">本週用電</div>
+            <div class="kwh-value" id="kwhWeek">-- kWh</div>
+          </div>
+          <div class="kwh-card">
+            <div class="kwh-label">本月用電</div>
+            <div class="kwh-value" id="kwhMonth">-- kWh</div>
+          </div>
+          <div class="kwh-card" id="costCard" style="display:none">
+            <div class="kwh-label">本月電費估算</div>
+            <div class="kwh-value" id="costMonth">-- 元</div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="chart-block">
+          <div class="chart-label">即時功率 <span class="chart-unit">W</span></div>
+          <div class="chart-canvas-wrap">
+            <canvas id="powerChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">電池電量 <span class="chart-unit">%</span></div>
+          <div class="chart-canvas-wrap">
+            <canvas id="batteryChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">負載 <span class="chart-unit">%</span></div>
+          <div class="chart-canvas-wrap">
+            <canvas id="loadChart"></canvas>
+          </div>
+        </div>
+
+      </section>
+
+      <div class="footer">
+        最後更新 <span id="lastUpdated">--</span>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="overlay" id="overlay"></div>
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2>系統設定</h2>
+      <button class="icon-btn" id="closeBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-layout">
+      <nav class="modal-nav" id="modalNav">
+        <button class="modal-tab active" data-tab="monitor">監控</button>
+        <button class="modal-tab" data-tab="notif">通知</button>
+        <button class="modal-tab" data-tab="hosts">遠端主機</button>
+        <button class="modal-tab" data-tab="actions">觸發動作</button>
+      </nav>
+      <div class="modal-content">
+        <section class="modal-pane active" id="pane-monitor"></section>
+        <section class="modal-pane" id="pane-notif"></section>
+        <section class="modal-pane" id="pane-hosts"></section>
+        <section class="modal-pane" id="pane-actions"></section>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="testBtn">發送測試通知</button>
+      <button class="btn-primary" id="saveBtn">儲存設定</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/chart.min.js?v=__ASSET_V__"></script>
+  <script src="/static/app.js?v=__ASSET_V__"></script>
+</body>
+</html>

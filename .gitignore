@@ -1,0 +1,29 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 機密設定
+.env
+
+# 執行時產生的資料
+config/settings.json
+config/history.db
+config/*.db-*
+data/
+
+
+# 建置快取
+/tmp/ups-build.log
+
+# 前端靜態資源（由安裝時下載）
+static/chart.min.js
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+
+CLAUDE.md
+ssh_keys/

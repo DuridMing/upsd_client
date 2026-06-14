@@ -1,0 +1,11 @@
+[
+  {
+    "id": "0f079ef0ad3c",
+    "name": "HPE",
+    "username": "durid",
+    "host": "192.168.77.241",
+    "port": 22,
+    "fingerprint": "SHA256:qPxEOB1sso1ShiuVkeQb8jhOEmBcIgnVUubOi1KwaM8",
+    "created_at": 1781440427
+  }
+]
