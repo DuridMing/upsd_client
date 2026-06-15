@@ -32,8 +32,9 @@ STATIC_DIR  = os.getenv("STATIC_DIR", "/static")
 SETTINGS_PATH = CONFIG_DIR / "settings.json"
 
 DEFAULT_SETTINGS: dict = {
-    "check_interval": 30,
+    "check_interval": 15,
     "electricity_rate": 0,
+    "test_message": "🔔 UPS Monitor 測試通知 — 連線正常",
     "notifications": {
         "on_battery": {
             "enabled": True,
@@ -256,8 +257,17 @@ async def get_stats():
 
 
 @app.post("/api/notify/test")
-async def test_notify():
-    ok = await notifier.send("🔔 UPS Monitor 測試通知 — 連線正常")
+async def test_notify(request: Request):
+    # 訊息來源優先序：請求帶入的即時內容（設定面板未存檔的編輯）→ 已存檔的 test_message → 後備預設
+    msg = ""
+    try:
+        body = await request.json()
+        msg = (body or {}).get("message", "") or ""
+    except Exception:
+        msg = ""
+    if not msg.strip():
+        msg = load_settings().get("test_message") or DEFAULT_SETTINGS["test_message"]
+    ok = await notifier.send(msg)
     return {
         "ok": ok,
         "token_set":   bool(LINE_ACCESS_TOKEN),

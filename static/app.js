@@ -74,8 +74,30 @@ function updateDashboard(d) {
   $('testInterval').textContent = ti ? Math.round(ti / 86400) : '--';
 
   $('lastUpdated').textContent = new Date().toLocaleTimeString('zh-TW');
+  lastDataTs = Date.now();   // 看門狗用：標記最後一次成功更新的時間
 
   checkBatteryAlert(d['ups.status'] || '');
+}
+
+// ── 自動更新看門狗 ──────────────────────────────────────────────────────────
+// 畫面更新主要靠 WebSocket 推送（後端每次輪詢就推一次）。但 WebSocket 可能在
+// 不觸發 onclose 的情況下「靜默半斷線」(TCP half-open)，導致畫面永遠停住。
+// 看門狗每 5 秒檢查：若超過 STALE_MS 沒收到任何更新，就主動抓 /api/status 補上，
+// 確保資料一定會在 10～15 秒內自動刷新。WebSocket 正常時不會觸發此備援。
+let lastDataTs = 0;
+const STALE_MS = 20_000;   // 後端輪詢 15s + 緩衝；超過視為 WS 可能斷線
+
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status');
+    if (r.ok) updateDashboard(await r.json());
+  } catch {}
+}
+
+function startStatusWatchdog() {
+  setInterval(() => {
+    if (Date.now() - lastDataTs > STALE_MS) refreshStatus();
+  }, 5_000);
 }
 
 // ── Battery alert (transient popup) ───────────────────────────────────────────
@@ -443,7 +465,7 @@ function renderNotifPane(s) {
         <div class="notif-body">
           <div class="form-group">
             <label>通知訊息</label>
-            <textarea id="${t.key}__msg" rows="2">${esc(c.message ?? '')}</textarea>
+            <textarea id="${t.key}__msg" rows="4">${esc(c.message ?? '')}</textarea>
             <span class="hint">${VARS_HINT}</span>
           </div>
           <div class="form-row">
@@ -460,6 +482,14 @@ function renderNotifPane(s) {
     <div class="form-section">
       <h3>瀏覽器推播</h3>
       <div id="browserNotifWrap">${browserNotifStatusHTML()}</div>
+    </div>
+    <div class="form-section">
+      <h3>測試通知訊息</h3>
+      <div class="form-group">
+        <label>測試訊息內容</label>
+        <textarea id="cfg__testmsg" rows="4">${esc(s.test_message ?? '')}</textarea>
+        <span class="hint">點視窗下方「發送測試通知」時送出的內容；按下測試會直接使用此處目前的文字（無需先儲存）。</span>
+      </div>
     </div>
     <p class="pane-intro">以下條件符合時透過 LINE 推播通知。門檻同時作為「觸發動作」的觸發條件。</p>
     <div class="form-section"><h3>LINE 通知條件</h3>${rows}</div>`;
@@ -656,6 +686,7 @@ function collectSettings() {
   const s = {
     check_interval:   parseInt($('cfg__interval').value) || 30,
     electricity_rate: parseFloat($('cfg__rate').value)   || 0,
+    test_message:     $('cfg__testmsg')?.value ?? '',
     notifications: {},
     actions: [],
   };
@@ -689,8 +720,14 @@ async function saveSettings() {
 async function sendTestNotification() {
   const btn = $('testBtn');
   btn.textContent = '發送中...'; btn.disabled = true;
+  // 帶上設定面板目前的測試訊息內容，讓尚未儲存的編輯也能直接測試
+  const message = $('cfg__testmsg')?.value || '';
   try {
-    const d = await (await fetch('/api/notify/test', { method: 'POST' })).json();
+    const d = await (await fetch('/api/notify/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    })).json();
     if (!d.token_set)    showToast('LINE_ACCESS_TOKEN 尚未設定（請設定環境變數）');
     else if (!d.user_id_set) showToast('ADMIN_USER_ID 尚未設定（請設定環境變數）');
     else if (d.ok)       showToast('測試通知已發送');
@@ -733,6 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try { updateNotifBtn(); } catch (e) { console.warn('notif init failed:', e); }
   try { initCharts(); }     catch (e) { console.warn('Chart.js init failed:', e); }
   try { connectWS(); }      catch (e) { console.warn('WebSocket init failed:', e); }
+  try { startStatusWatchdog(); } catch (e) { console.warn('watchdog init failed:', e); }
   try { setRange('24h'); }  catch (e) { console.warn('history init failed:', e); }
 
   fetch('/api/status').then(r => r.json()).then(updateDashboard).catch(() => {});

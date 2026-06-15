@@ -479,7 +479,11 @@ body {
   background: rgba(255,255,255,0.05); border: 1px solid var(--border);
   border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
   padding: 8px 10px; font-family: inherit; outline: none;
-  transition: border-color 0.2s; resize: none;
+  transition: border-color 0.2s;
+}
+/* 訊息欄位放大：較高的預設高度與行距，並允許使用者自行往下拉大 */
+.form-group textarea {
+  min-height: 84px; line-height: 1.5; resize: vertical;
 }
 .form-group input:focus, .form-group textarea:focus { border-color: rgba(59,130,246,0.5); }
 .hint { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
