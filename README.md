@@ -1,6 +1,6 @@
 # UPS Monitor
 
-基於 NUT（Network UPS Tools）的現代化 UPS 狀態監控 Web 服務，支援即時儀表板、長期用電趨勢圖表、電費估算，LINE Messaging API 與瀏覽器推播通知，以及**門檻觸發的遠端 SSH 動作**（例如電量過低時自動關機）。
+基於 NUT（Network UPS Tools）的現代化 UPS 狀態監控 Web 服務，支援即時儀表板、長期用電趨勢圖表、電費估算，透過 NotifySystem 轉送的通知（LINE 等平台）與瀏覽器推播，以及**門檻觸發的遠端 SSH 動作**（例如電量過低時自動關機）。
 
 ---
 
@@ -12,13 +12,13 @@
 | **狀態儀表板** | 電池電量環形圖、負載、電壓、續航時間等 8 張資訊卡 |
 | **用電趨勢圖表** | 功率(W)、電池電量(%)、負載(%) 歷史趨勢，支援 1小時/24小時/7天/30天 |
 | **電費估算** | 設定電費單價後自動計算今日/本週/本月用電量與費用 |
-| **LINE 通知** | 市電中斷、電量低、電量嚴重不足、市電恢復、UPS 過載 |
+| **通知（NotifySystem）** | 市電中斷、電量低、電量嚴重不足、市電恢復、UPS 過載；送到 NotifySystem 後再依設定轉送到 LINE 等平台 |
 | **頁面橫幅通知** | 切換電池供電時顯示動態警示橫幅 |
 | **瀏覽器推播** | 授權後在後台分頁也能收到系統通知 |
 | **遠端 SSH 動作** | 門檻觸發時於指定主機執行 sh 指令（如 `sudo shutdown`），可一個事件對應多個動作 |
 | **主機憑證管理** | Web 介面輸入 SSH 帳號／位置／私鑰；**建立後唯讀只能刪除**，私鑰永不回傳顯示 |
 | **分頁式設定 Modal** | 監控／通知／遠端主機／觸發動作，大型彈出視窗統一管理 |
-| **Token 安全隔離** | LINE Token / User ID 僅存於環境變數，不進入 Web 介面與 API |
+| **Hook 網址隔離** | NotifySystem 的 hook 網址只存於環境變數，不進入 Web 介面、API 與日誌 |
 
 ---
 
@@ -59,9 +59,7 @@ chmod +x install.sh
 安裝腳本會依序詢問：
 
 ```
-LINE Channel Secret（留空可稍後設定）: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-LINE Channel Access Token（留空可稍後設定）: <長字串 token>
-管理員 LINE User ID（留空可稍後設定）: Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NotifySystem hook 網址（留空可稍後設定）: http://192.168.77.241:8000/hooks/<key>
 UPS 名稱 [eaton5cs]: 
 Web 介面埠號 [8080]: 
 電費單價 元/kWh（0=不顯示費用）[0]: 3.5
@@ -115,9 +113,7 @@ http://localhost:8080
 
 | 變數 | 預設值 | 說明 |
 |------|--------|------|
-| `CHANNEL_SECRET` | _(空)_ | LINE Messaging API Channel Secret |
-| `LINE_ACCESS_TOKEN` | _(空)_ | LINE Channel Access Token（長期 or 短期）|
-| `ADMIN_USER_ID` | _(空)_ | 接收通知的管理員 LINE User ID（`Uxxxxxxxx…`）|
+| `NOTIFY_HOOK_URL` | _(空)_ | NotifySystem webhook 來源的網址（`http(s)://…/hooks/<key>`），key 等同密碼 |
 | `NUT_HOST` | `localhost` | NUT daemon 位址 |
 | `NUT_PORT` | `3493` | NUT daemon 埠號 |
 | `UPS_NAME` | `eaton5cs` | `upsc -l` 列出的 UPS 名稱 |
@@ -131,7 +127,7 @@ http://localhost:8080
 | 分頁 | 內容 |
 |------|------|
 | **監控** | 輪詢間隔（建議 10～60 秒）、電費單價（元/kWh，0 則隱藏費用估算）|
-| **通知** | 五種事件的 LINE 訊息、冷卻時間、電量／過載閾值 |
+| **通知** | 五種事件的通知訊息、冷卻時間、電量／過載閾值 |
 | **遠端主機** | 新增／刪除 SSH 主機憑證（write-once）|
 | **觸發動作** | 設定門檻觸發時要執行的遠端 sh 指令 |
 
@@ -190,35 +186,43 @@ http://localhost:8080
 
 ---
 
-## LINE Messaging API 設定
+## 通知設定（NotifySystem）
 
-### 步驟 1：建立 LINE Bot Channel
+通知不再直接呼叫 LINE，而是送到 NotifySystem（自架的通知整合平台）的 webhook 來源，
+由 NotifySystem 決定送到哪些平台（LINE、Discord、Telegram…），並負責重試與發送紀錄。
+LINE 的 Channel Access Token 和 User ID 改在 NotifySystem 的「通知平台」設定。
 
-1. 前往 [LINE Developers Console](https://developers.line.biz/console/)
-2. 建立 Provider（若尚未建立）
-3. 建立新 Channel → 選擇 **Messaging API**
-4. 在 Channel 設定頁取得：
-   - **Channel secret** → 填入 `.env` 的 `CHANNEL_SECRET`
-   - **Channel access token**（長期）→ 點選「Issue」產生 → 填入 `LINE_ACCESS_TOKEN`
+### 步驟 1：在 NotifySystem 建立來源
 
-### 步驟 2：取得管理員 User ID
+1. 「整合 → 通知平台」確認已有 LINE（或其他）通知平台
+2. 「整合 → 來源」新增一個 **webhook** 來源（例如「UPS」），通知對象勾選要送達的平台
+3. 複製來源的 `/hooks/<key>` 網址
 
-方法一：LINE Official Account Manager
-1. 前往 [OA Manager](https://manager.line.biz/) → 選擇你的帳號
-2. 在聊天室與自己（或管理員帳號）對話後，可從 API 回應或 OA Manager 後台查到 User ID
+### 步驟 2：填入 `.env`
 
-方法二：透過 Webhook（推薦）
-1. 在 LINE Developers Console 啟用 Webhook，將 URL 設為任意可接收 HTTP 的服務
-2. 用手機對 Bot 傳送任意訊息
-3. Webhook 收到的 JSON 中 `events[0].source.userId` 即為你的 User ID（格式：`Uxxxxxxxx…`）
+```
+NOTIFY_HOOK_URL=http://192.168.77.241:8000/hooks/<key>
+```
 
-取得後填入 `.env` 的 `ADMIN_USER_ID`，執行 `./install.sh update`。
+執行 `./install.sh update` 套用。網址裡的 key 等同密碼，不要提交到 git 或貼到公開的地方。
 
 ### 步驟 3：測試通知
 
-在 Web 介面設定面板底部點擊「**發送測試通知**」，確認 LINE Bot 傳訊成功。
+在 Web 介面設定面板底部點擊「**發送測試通知**」，確認目的平台收到訊息，
+並可在 NotifySystem 的「投遞紀錄」看到這一筆。
 
-> **注意**：使用前須先在手機「加 Bot 為好友」，否則 Push API 無法傳送訊息。
+### 送出的格式
+
+每則通知帶有標題、等級和標籤（`ups` 加上事件名稱），可以在 NotifySystem 用規則依等級或標籤分送：
+
+| 事件 | 標題 | 等級 |
+|------|------|------|
+| `on_battery` | UPS 改用電池供電 | warning |
+| `battery_low` | UPS 電量偏低 | warning |
+| `battery_critical` | UPS 電量嚴重不足 | critical |
+| `overload` | UPS 過載 | error |
+| `power_restored` | UPS 市電恢復 | info |
+| 測試 | UPS 測試通知 | info |
 
 ---
 
@@ -242,7 +246,7 @@ upsd_client/
 │   ├── main.py          # FastAPI 應用程式、WebSocket、REST API
 │   ├── nut_client.py    # NUT 協議客戶端（asyncio TCP）
 │   ├── monitor.py       # 背景輪詢、事件偵測、通知與動作觸發
-│   ├── notifier.py      # LINE Messaging API Push 發送
+│   ├── notifier.py      # 送通知到 NotifySystem 的 webhook 來源
 │   ├── ssh_hosts.py     # 遠端主機憑證存放（write-once，私鑰 0600）
 │   ├── actions.py       # 遠端 SSH 指令執行（asyncssh）
 │   ├── history.py       # SQLite 時序資料庫（aiosqlite）
@@ -275,7 +279,7 @@ upsd_client/
 | 資料 | SQLite（透過 aiosqlite 非同步存取） |
 | 遠端執行 | asyncssh（非同步 SSH，key-only 驗證） |
 | 容器 | Podman / Docker（`network_mode: host`） |
-| 協議 | NUT over TCP 3493 · WebSocket · LINE Messaging API · SSH |
+| 協議 | NUT over TCP 3493 · WebSocket · NotifySystem webhook · SSH |
 
 ---
 
@@ -362,15 +366,14 @@ curl -L https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js -o sta
 2. 確認瀏覽器網址為 `http://localhost`（非 `http://IP`）或 HTTPS——瀏覽器 Notification API 僅允許安全來源
 3. 確認系統通知未被靜音或勿擾模式封鎖
 
-### LINE 通知相關
+### 通知相關
 
-| 錯誤訊息 | 原因 | 解決方式 |
+| 現象 | 原因 | 解決方式 |
 |---------|------|---------|
-| `LINE_ACCESS_TOKEN 尚未設定` | `.env` 缺少 Token | 填寫後執行 `./install.sh update` |
-| `ADMIN_USER_ID 尚未設定` | `.env` 缺少 User ID | 依上方步驟取得後填入 |
-| 發送失敗 (401) | Token 無效或過期 | 至 LINE Developers Console 重新 Issue |
-| 發送失敗 (400) | User ID 格式錯誤 | 確認格式為 `Uxxxxxxxx…`（大寫 U 開頭）|
-| Bot 傳訊但收不到 | 尚未加 Bot 為好友 | 用手機掃描 QR Code 加好友 |
+| `NOTIFY_HOOK_URL 尚未設定` | `.env` 缺少 hook 網址 | 填寫後執行 `./install.sh update` |
+| 發送失敗，日誌為 `NotifySystem unreachable` | 連不到 NotifySystem | 確認 NotifySystem 有在跑、網址和埠號正確、防火牆有開 |
+| 發送失敗，日誌為 `HTTP 404` | hook key 錯誤，或來源被刪除／重新產生網址 | 到 NotifySystem 重新複製網址 |
+| 測試成功但平台收不到 | NotifySystem 那邊沒送出 | 看 NotifySystem 的「投遞紀錄」，確認來源的通知對象和平台設定 |
 
 ### SELinux 權限錯誤（config 目錄）
 
@@ -390,8 +393,8 @@ podman inspect ups-monitor | grep -A3 Mounts
 ## 資料保留與隱私
 
 - 歷史資料儲存於 `data/history.db`，自動清除 90 天以前的記錄
-- 所有資料留存於本機，不傳送至任何第三方（LINE 通知除外）
-- LINE Token、Channel Secret、User ID 僅在容器環境變數中，不寫入資料庫或日誌
+- 所有資料留存於本機，不傳送至任何第三方（通知只送到你自己的 NotifySystem）
+- NotifySystem 的 hook 網址只在容器環境變數中，不寫入資料庫或日誌（httpx 的請求日誌也已關閉）
 - SSH 私鑰以 `0600` 權限存於 `config/ssh_keys/`，永不透過 API 回傳——但仍會持久化於 `config/` Volume，請妥善保護該目錄（建議搭配專用、最小權限的 SSH 金鑰）
 
 ---

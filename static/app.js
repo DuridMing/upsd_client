@@ -145,7 +145,7 @@ $('alertClose').addEventListener('click', hideBatteryBanner);
 
 // ── Browser notifications ─────────────────────────────────────────────────────
 // 瀏覽器推播只在「安全環境」(HTTPS 或 localhost) 才能使用；以 http://<IP> 連線會被
-// 瀏覽器基於安全性封鎖。此時系統其餘功能與 LINE 通知不受影響，僅停用瀏覽器推播。
+// 瀏覽器基於安全性封鎖。此時系統其餘功能與通知（NotifySystem）不受影響，僅停用瀏覽器推播。
 const hasNotifAPI = 'Notification' in window;
 
 // → 'unsupported' | 'insecure' | 'granted' | 'denied' | 'default'
@@ -202,7 +202,7 @@ function browserNotifStatusHTML() {
     <div class="notif-status ${m.cls}">
       <div class="notif-status-main"><span>${m.icon}</span><div>${m.text}</div></div>
       ${m.btn ? `<button class="btn-mini" id="enableNotifBtn">${m.btn}</button>` : ''}
-      <div class="notif-status-foot">無論瀏覽器推播是否啟用，<strong>LINE 通知</strong>都會照常運作，不受影響。</div>
+      <div class="notif-status-foot">無論瀏覽器推播是否啟用，<strong>通知（NotifySystem）</strong>都會照常運作，不受影響。</div>
     </div>`;
 }
 
@@ -491,8 +491,8 @@ function renderNotifPane(s) {
         <span class="hint">點視窗下方「發送測試通知」時送出的內容；按下測試會直接使用此處目前的文字（無需先儲存）。</span>
       </div>
     </div>
-    <p class="pane-intro">以下條件符合時透過 LINE 推播通知。門檻同時作為「觸發動作」的觸發條件。</p>
-    <div class="form-section"><h3>LINE 通知條件</h3>${rows}</div>`;
+    <p class="pane-intro">以下條件符合時送出通知（經由 NotifySystem 轉送到 LINE 等平台）。門檻同時作為「觸發動作」的觸發條件。</p>
+    <div class="form-section"><h3>通知條件</h3>${rows}</div>`;
   wireBrowserNotifBtn();
 }
 
@@ -728,10 +728,9 @@ async function sendTestNotification() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
     })).json();
-    if (!d.token_set)    showToast('LINE_ACCESS_TOKEN 尚未設定（請設定環境變數）');
-    else if (!d.user_id_set) showToast('ADMIN_USER_ID 尚未設定（請設定環境變數）');
-    else if (d.ok)       showToast('測試通知已發送');
-    else                 showToast('發送失敗，請確認 Token 與 User ID 是否正確');
+    if (!d.hook_set) showToast('NOTIFY_HOOK_URL 尚未設定（請設定環境變數）');
+    else if (d.ok)   showToast('測試通知已送到 NotifySystem');
+    else             showToast('發送失敗，請確認 NotifySystem 連得到、hook 網址正確');
   } catch { showToast('發送失敗'); }
   finally { btn.textContent = '發送測試通知'; btn.disabled = false; }
 }

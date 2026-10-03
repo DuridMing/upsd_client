@@ -13,6 +13,14 @@ DEFAULT_MESSAGES = {
     "battery_low":      "🔴 電池電量低",
     "overload":         "⚡ UPS 過載",
 }
+# 送到 NotifySystem 時的標題與等級（等級決定各平台的顯示方式和規則比對）
+EVENT_META = {
+    "on_battery":       ("UPS 改用電池供電", "warning"),
+    "power_restored":   ("UPS 市電恢復", "info"),
+    "battery_critical": ("UPS 電量嚴重不足", "critical"),
+    "battery_low":      ("UPS 電量偏低", "warning"),
+    "overload":         ("UPS 過載", "error"),
+}
 DEFAULT_COOLDOWNS = {
     "on_battery": 300, "power_restored": 60,
     "battery_critical": 120, "battery_low": 300, "overload": 300,
@@ -102,7 +110,9 @@ class UPSMonitor:
             if not self._cooldown_ok(f"notif:{key}", cooldown):
                 continue
             message = self._fmt(cfg.get("message", DEFAULT_MESSAGES.get(key, key)), data)
-            if not await self.notifier.send(message):
+            title, level = EVENT_META.get(key, (None, "info"))
+            if not await self.notifier.send(message, title=title, level=level,
+                                            tags=["ups", key]):
                 # 送失敗時重置 cooldown，讓下一輪可重試
                 self.last_notif_time.pop(f"notif:{key}", None)
 

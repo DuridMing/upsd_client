@@ -121,9 +121,7 @@ cmd_install() {
         printf -v "$var" '%s' "${_in:-$cur}"
     }
 
-    prompt "LINE Channel Secret（留空可稍後設定）"      "${CHANNEL_SECRET:-}"      CHANNEL_SECRET
-    prompt "LINE Channel Access Token（留空可稍後設定）" "${LINE_ACCESS_TOKEN:-}"   LINE_ACCESS_TOKEN
-    prompt "管理員 LINE User ID（留空可稍後設定）"      "${ADMIN_USER_ID:-}"       ADMIN_USER_ID
+    prompt "NotifySystem hook 網址（留空可稍後設定）"   "${NOTIFY_HOOK_URL:-}"     NOTIFY_HOOK_URL
     prompt "UPS 名稱"                                   "${UPS_NAME:-eaton5cs}"    UPS_NAME
     prompt "NUT daemon 主機"                            "${NUT_HOST:-localhost}"    NUT_HOST
     prompt "NUT 帳號（留空=匿名）"                     "${NUT_USER:-}"            NUT_USER
@@ -134,10 +132,8 @@ cmd_install() {
     # ── [3/6] 建立設定檔與目錄
     step 3 $TOTAL "建立設定檔與目錄"
     cat > "$ENV_FILE" << ENVEOF
-# ── LINE Messaging API ────────────────────────────────────────────────────────
-CHANNEL_SECRET=${CHANNEL_SECRET}
-LINE_ACCESS_TOKEN=${LINE_ACCESS_TOKEN}
-ADMIN_USER_ID=${ADMIN_USER_ID}
+# ── 通知（NotifySystem 的 webhook 來源網址）─────────────────────────────────
+NOTIFY_HOOK_URL=${NOTIFY_HOOK_URL}
 
 # ── NUT daemon ────────────────────────────────────────────────────────────────
 NUT_HOST=${NUT_HOST:-localhost}
@@ -247,8 +243,8 @@ except Exception as e:
     echo -e "  即時日誌  ：${C}./install.sh logs${N}"
     hline
 
-    { [ -z "${LINE_ACCESS_TOKEN:-}" ] || [ -z "${ADMIN_USER_ID:-}" ]; } && \
-        warn "LINE 設定未完整，請編輯 .env 後執行 ${C}./install.sh update${N}"
+    [ -z "${NOTIFY_HOOK_URL:-}" ] && \
+        warn "尚未設定 NOTIFY_HOOK_URL，請編輯 .env 後執行 ${C}./install.sh update${N}"
     echo ""
 }
 

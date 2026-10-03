@@ -18,7 +18,7 @@ import actions
 import history
 import ssh_hosts
 from monitor import UPSMonitor
-from notifier import LineNotifier
+from notifier import NotifySystemNotifier
 from nut_client import NUTClient
 
 logging.basicConfig(
@@ -92,11 +92,10 @@ NUT_PORT         = int(os.getenv("NUT_PORT", "3493"))
 UPS_NAME         = os.getenv("UPS_NAME", "eaton5cs")
 NUT_USER         = os.getenv("NUT_USER", "").strip() or None
 NUT_PASSWORD     = os.getenv("NUT_PASSWORD", "").strip() or None
-LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN", "").strip()
-ADMIN_USER_ID    = os.getenv("ADMIN_USER_ID", "").strip()
+NOTIFY_HOOK_URL  = os.getenv("NOTIFY_HOOK_URL", "").strip()
 
 nut_client = NUTClient(NUT_HOST, NUT_PORT, UPS_NAME, NUT_USER, NUT_PASSWORD)
-notifier   = LineNotifier(LINE_ACCESS_TOKEN or None, ADMIN_USER_ID or None)
+notifier   = NotifySystemNotifier(NOTIFY_HOOK_URL or None)
 monitor    = UPSMonitor(nut_client, notifier, load_settings,
                         host_getter=ssh_hosts.get_host,
                         action_runner=actions.run_command)
@@ -267,12 +266,8 @@ async def test_notify(request: Request):
         msg = ""
     if not msg.strip():
         msg = load_settings().get("test_message") or DEFAULT_SETTINGS["test_message"]
-    ok = await notifier.send(msg)
-    return {
-        "ok": ok,
-        "token_set":   bool(LINE_ACCESS_TOKEN),
-        "user_id_set": bool(ADMIN_USER_ID),
-    }
+    ok = await notifier.send(msg, title="UPS 測試通知", level="info", tags=["ups", "test"])
+    return {"ok": ok, "hook_set": notifier.configured}
 
 
 @app.websocket("/ws")
