@@ -11,9 +11,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Create venv and install dependencies in one layer
+# Create venv and install dependencies in one layer.
+# The venv bundles its own (outdated) pip from ensurepip, so upgrade it inside the venv first.
 COPY app/requirements.txt .
 RUN python3 -m venv $VIRTUAL_ENV \
+    && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY app/ /app/
