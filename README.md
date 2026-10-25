@@ -1,5 +1,9 @@
 # UPS Monitor
 
+> **已下線（2026-10-25），本 repo 封存、不再維護。**
+> UPS 的狀態、告警與用電統計改由 homelab 的 nut_exporter → Prometheus／Alertmanager／Grafana 負責；
+> 斷電關機一直由主機上的 NUT upsmon 處理，不依賴本服務。
+
 基於 NUT（Network UPS Tools）的現代化 UPS 狀態監控 Web 服務，支援即時儀表板、長期用電趨勢圖表、電費估算，透過 NotifySystem 轉送的通知（LINE 等平台）與瀏覽器推播，以及**門檻觸發的遠端 SSH 動作**（例如電量過低時自動關機）。
 
 ---
